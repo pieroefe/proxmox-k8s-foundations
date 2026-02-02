@@ -1,99 +1,160 @@
-# Networking Design and Configuration
+Networking Design and Configuration
 
-This document describes the networking design used in the infrastructure lab,
-with a focus on Linux networking fundamentals and how they integrate with
-Proxmox virtualization.
+This document describes the networking design used in the infrastructure lab, focusing on Linux networking fundamentals and their integration with Proxmox virtualization and Kubernetes preparation.
 
-Reliable and well-understood networking is critical, as it provides management
-access to the hypervisor and enables communication between virtual machines and
-higher-level services.
+A clear and predictable networking setup is essential, as it provides management access to the hypervisor, enables reliable communication between virtual machines, and serves as the foundation for the Kubernetes cluster.
 
-## Networking Goals
+Networking Goals
 
-The networking layer is designed to achieve the following goals:
+The networking layer is designed to meet the following objectives:
 
-- Provide stable management access to the Proxmox host
-- Enable connectivity between the host and virtual machines
-- Maintain simplicity during the initial setup phase
-- Expose Linux networking concepts such as bridges and interfaces
+Provide stable management access to the Proxmox host
 
-## Management Network Design
+Enable reliable connectivity between virtual machines
 
-A dedicated management network is used for accessing the Proxmox web interface
-and administrative services.
+Keep the initial setup simple and easy to troubleshoot
 
-Key characteristics:
-- Static IP addressing
-- Direct connectivity during initial setup
-- Clear separation between management access and future workload traffic
+Expose and reinforce core Linux networking concepts
 
-This approach simplifies troubleshooting and reduces external dependencies
-during early deployment stages.
+Prepare the environment for Kubernetes node communication
 
-## Linux Bridge (vmbr0)
+Management Network Design
 
-Proxmox relies on Linux bridges to connect virtual machines to physical network
-interfaces. In this lab, the primary bridge is `vmbr0`.
+A dedicated management network is used to access the Proxmox web interface and perform administrative tasks.
 
-The bridge serves as the central networking component and is responsible for:
-- Hosting the management IP address of the Proxmox node
-- Connecting virtual machines to the physical network
-- Abstracting the physical interface from higher layers
+Key characteristics of this network include:
 
-A key design decision is assigning the management IP address to the bridge
-(`vmbr0`) rather than to the physical network interface. This ensures that
-network connectivity remains consistent even as virtual machines are added or
-network configurations evolve.
+Static IP addressing
 
-## Physical Interface Binding
+Direct connectivity during the initial setup phase
 
-The physical network interface is configured as a bridge port and does not hold
-an IP address directly. Its role is limited to forwarding traffic between the
-bridge and the physical network.
+Clear separation between management access and future workload traffic
 
-This separation allows:
-- Cleaner network abstraction
-- Reduced risk of misconfiguration
-- Better alignment with Proxmox networking best practices
+This approach reduces external dependencies and simplifies early-stage troubleshooting.
 
-## Initial Connectivity Model
+Linux Bridge Configuration (vmbr0)
 
-During the initial setup phase, direct connectivity between a laptop and the
-server is used. Static IP addresses are manually configured on both ends to
-establish management access without relying on external network services such
-as DHCP.
+Proxmox relies on Linux bridges to connect virtual machines to physical network interfaces. In this lab, the primary bridge used is vmbr0.
+
+The bridge is responsible for:
+
+Hosting the management IP address of the Proxmox node
+
+Connecting virtual machines to the physical network
+
+Abstracting the physical interface from higher layers
+
+A key design decision is assigning the management IP address to the bridge (vmbr0) rather than to the physical network interface. This ensures network connectivity remains consistent as virtual machines are added or modified.
+
+Physical Interface Binding
+
+The physical network interface is configured solely as a bridge port and does not hold an IP address.
+
+Its role is limited to forwarding traffic between the Linux bridge and the physical network, which allows:
+
+Cleaner network abstraction
+
+Reduced risk of misconfiguration
+
+Alignment with Proxmox networking best practices
+
+Initial Connectivity Model
+
+During the initial deployment phase, direct connectivity between a laptop and the server is used. Static IP addresses are manually configured on both ends to establish management access without relying on external services such as DHCP.
 
 This model enables:
-- Faster validation of basic connectivity
-- Easier isolation of network issues
-- Clear visibility into Linux interface behavior
 
-## Common Networking Pitfalls
+Fast validation of basic connectivity
 
-Several common issues were encountered and documented during setup:
+Easier isolation of network-related issues
 
-- Assigning the management IP to the physical interface instead of the bridge
-- Misidentifying Linux network interface names
-- Changes not taking effect due to missing network reloads
-- Confusion between host networking and virtual machine networking
+Clear visibility into Linux interface behavior
 
-These issues reinforce the importance of understanding Linux networking
-constructs rather than relying solely on graphical interfaces.
+Virtual Machine Networking (Kubernetes Preparation)
 
-## Future Networking Evolution
+As the project progresses beyond basic virtualization, networking considerations are extended to the Linux virtual machines that will act as Kubernetes nodes.
 
-As the project evolves, the networking layer will be extended to include:
+Kubernetes places strict requirements on node reachability and network stability. For this reason, networking inside the virtual machines is treated as a deliberate design choice rather than a default configuration.
 
-- Integration with external switches and routers
-- VLAN-based network segmentation
-- Separation between management and workload traffic
-- Networking considerations for Kubernetes clusters
+IP Addressing Strategy for Kubernetes Nodes
 
-These enhancements will build on the same Linux bridge concepts introduced in
-this initial phase.
+All Kubernetes nodes use static IP addressing configured at the operating system level.
 
----
+This decision ensures:
 
-This networking design establishes a clear and stable foundation for both
-virtualization and container orchestration while reinforcing essential Linux
-networking principles.
+Stable node identity within the cluster
+
+Predictable control-plane and worker communication
+
+Independence from DHCP during cluster initialization
+
+Simplified troubleshooting
+
+Dynamic IP addressing was intentionally avoided to prevent issues during cluster bootstrap and node joins.
+
+Node Addressing Scheme
+
+The following addressing scheme is used within the lab network:
+
+Node Name	Role	IP Address
+k8s-master	Control Plane	10.10.10.10
+k8s-worker1	Worker Node	10.10.10.11
+k8s-worker2	Worker Node	10.10.10.12
+
+All nodes reside on the same Layer 2 network provided by the Proxmox bridge (vmbr0), enabling direct east–west communication without additional routing complexity.
+
+Guest Networking Configuration
+
+Inside each virtual machine, networking is configured using Netplan with the following principles:
+
+Static IPv4 configuration
+
+Explicit default gateway
+
+Manually defined DNS resolvers
+
+Single primary network interface
+
+This configuration provides deterministic behavior and aligns with Kubernetes initialization requirements.
+
+Host-to-Guest and Guest-to-Guest Connectivity
+
+The Linux bridge (vmbr0) serves as the Layer 2 domain for the Proxmox host and all Kubernetes nodes.
+
+This allows:
+
+Management access to the hypervisor
+
+Direct communication between Kubernetes nodes
+
+A simple and observable networking model during early cluster stages
+
+At this phase, no VLAN segmentation or advanced network isolation is implemented. These features are intentionally deferred until the base cluster is stable.
+
+Common Networking Pitfalls Encountered
+
+During setup, several issues were encountered and documented:
+
+Assigning the management IP to the physical interface instead of the bridge
+
+Misidentifying Linux network interface names
+
+Network changes not taking effect due to missing reloads
+
+Confusion between host networking and guest networking
+
+These issues highlight the importance of understanding Linux networking concepts rather than relying solely on graphical interfaces.
+
+Future Networking Evolution
+
+Once the Kubernetes cluster is fully operational, the networking layer may be extended to include:
+
+VLAN-based segmentation
+
+Separation between management and workload traffic
+
+Kubernetes CNI-specific considerations
+
+Integration with external switching and routing infrastructure
+
+All future enhancements will build on the same Linux bridge fundamentals introduced in this phase.
