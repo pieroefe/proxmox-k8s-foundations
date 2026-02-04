@@ -1,0 +1,68 @@
+# Kubernetes - Comandos clave y para qué sirven
+
+## Cluster / Estado general
+kubectl get nodes ---> lista los nodos del cluster y su estado (Ready/NotReady)
+kubectl get pods -A ---> lista todos los pods en todos los namespaces
+kubectl get svc -A ---> lista todos los servicios (ClusterIP/NodePort/LoadBalancer)
+kubectl get ns ---> lista namespaces disponibles
+kubectl cluster-info ---> muestra endpoints principales del control-plane (API server)
+
+## Diagnóstico rápido
+kubectl describe node <NODE> ---> detalle del nodo (condiciones, allocatable, eventos)
+kubectl describe pod <POD> -n <NS> ---> explica por qué un pod no arranca (eventos y errores)
+kubectl logs <POD> -n <NS> ---> logs del contenedor (ideal para ver errores de app)
+kubectl logs -n <NS> -l app=<LABEL> --tail=200 ---> logs por label (útil en DaemonSets/Deployments)
+kubectl get events -A --sort-by=.metadata.creationTimestamp ---> eventos del cluster en orden temporal
+
+## Recursos / Consumo
+kubectl top nodes ---> uso de CPU/RAM por nodo (requiere metrics-server)
+kubectl top pods -A ---> uso de CPU/RAM por pod (requiere metrics-server)
+
+## Deployments / Rollouts
+kubectl get deploy -n <NS> ---> lista deployments del namespace
+kubectl rollout status deploy/<DEPLOY> -n <NS> ---> sigue el estado de un despliegue
+kubectl rollout restart deploy/<DEPLOY> -n <NS> ---> reinicia pods (sin borrar manifiestos)
+kubectl scale deploy/<DEPLOY> -n <NS> --replicas=1 ---> cambia la cantidad de réplicas
+
+## DaemonSets (ej: flannel, node-exporter)
+kubectl get ds -n <NS> ---> lista DaemonSets del namespace
+kubectl rollout restart ds/<DS> -n <NS> ---> reinicia DaemonSet en todos los nodos
+kubectl rollout status ds/<DS> -n <NS> ---> valida que todos los pods del DaemonSet estén listos
+
+## Networking / Exposición de servicios
+kubectl get svc <SVC> -n <NS> ---> ver puertos, tipo de service y ClusterIP
+kubectl port-forward svc/<SVC> 3000:80 -n <NS> ---> expone un service localmente (útil para Grafana)
+kubectl port-forward pod/<POD> 8080:8080 -n <NS> ---> expone un pod directo (debug rápido)
+
+## Aplicar / Borrar manifiestos
+kubectl apply -f <file-or-dir> ---> aplica manifiestos (crear/actualizar)
+kubectl delete -f <file-or-dir> ---> elimina recursos definidos en manifiestos
+kubectl diff -f <file-or-dir> ---> muestra diferencias antes de aplicar cambios
+
+## Config / Contexto
+kubectl config get-contexts ---> lista contextos disponibles (clusters/perfiles)
+kubectl config current-context ---> muestra el contexto actual
+kubectl config use-context <CTX> ---> cambia de contexto
+kubectl config view ---> muestra la configuración kubeconfig actual
+
+## Troubleshooting del nodo (Linux)
+sudo systemctl status kubelet --no-pager ---> estado del servicio kubelet (si falla, el nodo cae)
+sudo journalctl -u kubelet -n 80 --no-pager ---> logs recientes del kubelet (diagnóstico real)
+sudo systemctl status containerd --no-pager ---> estado del runtime (si cae, kubelet falla)
+sudo systemctl restart containerd ---> reinicia containerd (runtime)
+sudo systemctl restart kubelet ---> reinicia kubelet (node agent)
+
+## Runtime / Contenedores (cuando kubectl no ayuda)
+sudo crictl ps -a ---> lista contenedores (incluye control-plane estático en master)
+sudo crictl logs <CONTAINER_ID> --tail=200 ---> logs del contenedor (útil si kube-apiserver/etcd mueren)
+sudo ss -lntp | grep 6443 ---> valida si el API server está escuchando en 6443
+
+## Checks específicos de CNI (Flannel)
+kubectl get pods -n kube-flannel -o wide ---> estado del CNI flannel por nodo
+kubectl logs -n kube-flannel -l app=flannel --tail=200 ---> logs de flannel (si no hay red de pods)
+ls -l /run/flannel/subnet.env ---> valida si flannel generó subnet.env (necesario para crear sandboxes)
+
+## Limpieza / debugging extra
+kubectl exec -it <POD> -n <NS> -- sh ---> entrar a un contenedor para debug (si tiene shell)
+kubectl delete pod <POD> -n <NS> ---> fuerza recreación del pod (si está trabado)
+kubectl get all -n <NS> ---> vista rápida de recursos comunes en un namespace
